@@ -121,7 +121,7 @@ The VM is multithreaded (these are not real threads) and all threads are run in 
 
 The state of a thread consists only of its PC (program counter) and its set of registers (two for each named group). At any time there can't be more than one thread with the same PC.
 
-This approach is used by Pike and Janson in the *sam* editor.
+This approach is used by Pike and Janson in the *sam* editor and is documented [here](http://swtch.com/~rsc/regexp/regexp2.html#ahu74).
 
 ### PRED pred-fn
 `pred-fn` is a predicate function which gets called on the current element.
