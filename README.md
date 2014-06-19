@@ -35,7 +35,7 @@ And have fun:
 ```
 
 A more complex example:
- 
+
 ```clj
 => (se/exec
      (se/cat
@@ -45,11 +45,15 @@ A more complex example:
        (se/|
          (se/as :body vector? (se/* se/_))
          (se/as :bodies
-           (partial se/exec (se/cat vector? (se/* se/_))))))
+           (se/+ (partial se/exec (se/cat vector? (se/* se/_)))))))
      '(fn-name "some-doc" {:meta :data}
         ([a] ...)
         ([a b] ...)))
-{:rest (([a b] ...)), :match (fn-name "some-doc" {:meta :data} ([a] ...)), :bodies (([a] ...)), :name (fn-name), :docstring ("some-doc"), :meta ({:meta :data})}
+{:rest (), :match (fn-name "some-doc" {:meta :data} ([a] ...) ([a b] ...)),
+ :bodies (([a] ...) ([a b] ...)),
+ :name (fn-name),
+ :docstring ("some-doc"),
+ :meta ({:meta :data})}
 ```
 
 ## License
