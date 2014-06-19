@@ -6,7 +6,7 @@ Seqexp salient features are:
 
 * linear runtime
 * lazy-friendly (doesn't consume the whole seq when possible)
-* named groups using `as` (in addtion to default groups: `:match` and `:rest`)
+* named groups using `as` (in addition to default groups: `:match` and `:rest`)
 * greedy (`*`, `+`, `?`, `repeat`) and reluctant quantifiers (`*?`, `+?`, `??`, `repeat?`)
 * short and sweet codebase (~200LOC)
 
