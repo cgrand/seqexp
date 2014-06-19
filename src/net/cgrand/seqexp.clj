@@ -62,7 +62,7 @@
 
 (decline {* *? + +? ? ?? repeat repeat? fork> fork< fork< fork> :fork> :fork< :fork< :fork>}
   (defn *
-    "Matches its a body zero or more times.
+    "Matches its body zero or more times.
      Exists in greedy (*) and reluctant (*?) variants."
     [e & es]
     (asmpat
@@ -73,7 +73,7 @@
       label   end))
 
   (defn +
-    "Matches its a body one or more times.
+    "Matches its body one or more times.
      Exists in greedy (+) and reluctant (+?) variants."
     [e & es]
     (asmpat
@@ -82,7 +82,7 @@
       fork<   start))
 
   (defn ?
-    "Matches its a body zero or once.
+    "Matches its body zero or once.
      Exists in greedy (?) and reluctant (??) variants."
     [e & es]
     (asmpat
@@ -91,7 +91,7 @@
       label   end))
 
   (defn repeat
-    "Matches its a body min to max times (inclusive).
+    "Matches its body min to max times (inclusive).
      Exists in greedy (repeat) and reluctant (repeat?) variants."
     ([max e]
       (repeat 0 max e))
