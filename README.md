@@ -71,7 +71,7 @@ What about the difference between greedy and reluctant quantifiers?
 
 In the above example we see that in the first case the inner `*` matches as much as possible while in the second case `*?` matches as little as possible.
 
-Greediness affects only submatches and never changes the whole match.
+Greediness affects only submatches and never changes the whole match: flipping a quantifier from greedy to reluctant (or the other way round) is never going to change what is returned under `:match` and `:rest`, it only affects groups.
 
 
 
@@ -115,26 +115,40 @@ Lazy-friendliness:
 
 ## Implementation details
 
-Seqexp uses a stackless VM with 5 opcodes, all taking one argument: PRED, JUMP, FORK>, FORK< AND SAVE.
+Seqexp uses a stackless VM with 5 opcodes (`PRED`, `JUMP`, `FORK>`, `FORK<` and `SAVE`), all taking one argument.
 
-Each thread is only identified by its PC (program counter) and its set of registers (two for each named group). At any time ther can't be more than one thread with the same PC.
+The VM is multithreaded (these are not real threads) and all threads are run in lockstep.
 
-This approach is used by Pike and Janson in the sam editor.
+The state of a thread consists only of its PC (program counter) and its set of registers (two for each named group). At any time there can't be more than one thread with the same PC.
+
+This approach is used by Pike and Janson in the *sam* editor.
 
 ### PRED pred-fn
-Its argument is a predicate function which gets called on the current element.
+`pred-fn` is a predicate function which gets called on the current element.
 
 ### JUMP address
-Performs a relative jump, its argument is the relative address.
+Performs a relative jump, `address` is the relative address.
 
 ### FORK> address and FORK< address
-Forks the current thread, one will continue to the next instruction while the other will performs a relative jump.
+Forks the current thread in two threads, one thread will continue to the next instruction while the other will performs a relative jump to the specified `address`.
 
-The difference between the two forks is the relative priority of the two resulting threads.
+The difference between `FORK>` and `FORK<` is the relative priority of the two resulting threads: `FORK>` gives priority to the continuing thread while `FORK<` gives priority to the jumping thread.
 
-### SAVE register
-Saves the current position to the specified register. 
+It should be noted that the only effect of this *priority* is submatch selection: when a match is found, its the highest-priority thread amongst the successful thread that gets to pick the submatches (groups). It follows that priority doesn't change the whole match.
 
+### SAVE register-name
+Saves the current position to the specified register.
+
+### Example
+
+For example, `(se/cat (se/* odd?) 7)` compiles down to:
+
+```
+FORK> 3
+PRED  odd?
+JUMP  -2
+PRED  #(= 7 %)
+```
 
 ## License
 
