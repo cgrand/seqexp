@@ -56,6 +56,14 @@ A more complex example:
  :meta ({:meta :data})}
 ```
 
+Lazy-friendliness:
+
+```clj
+=> (:match (se/exec (se/* #(< % 10)) (range)))
+(0 1 2 3 4 5 6 7 8 9)
+```
+
+
 ## License
 
 Copyright © 2014 Christophe Grand
