@@ -54,17 +54,19 @@ Named groups are introduced with `as`:
 What about the difference between greedy and reluctant quantifiers?
 
 ```clj
+; greedy *
 => (se/exec
         (se/* (se/cat (se/as :odds-before-7 (se/* odd?)) 7))
-        [1 3 3 7 1 3 3 7])
+        [1 3 3 7 1 5 5 7])
 
-{:rest (), :odds-before-7 (1 3 3 7 1 3 3), :match (1 3 3 7 1 3 3 7)}
+{:rest (), :odds-before-7 (1 3 3 7 1 5 5), :match (1 3 3 7 1 5 5 7)}
 
+; reluctant *?
 => (se/exec
         (se/* (se/cat (se/as :odds-before-7 (se/*? odd?)) 7))
-        [1 3 3 7 1 3 3 7])
+        [1 3 3 7 1 5 5 7])
 
-{:rest (), :odds-before-7 (1 3 3), :match (1 3 3 7 1 3 3 7)}
+{:rest (), :odds-before-7 (1 5 5), :match (1 3 3 7 1 5 5 7)}
 ```
 
 In the above example we see that in the first case the inner `*` matches as much as possible while in the second case `*?` matches as little as possible.
