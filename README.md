@@ -126,7 +126,7 @@ This approach is used by Pike and Janson in the *sam* editor and is documented [
 ### PRED pred-fn
 `pred-fn` is a predicate function which gets called on the current element.
 
-If the predicate succeeds, the thread continues to the next instruction. When the predicate fails the thread is terminated.
+If the predicate succeeds, the thread continues to the next instruction and to the next element of the input sequence. When the predicate fails the thread is terminated.
 
 ### JUMP address
 Performs a relative jump, `address` is the relative address.
