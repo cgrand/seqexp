@@ -169,9 +169,6 @@
 (defn- init-state [insts coll]
   [insts 0 coll (add-thread no-threads 0 (cons 0 coll) {} insts)])
 
-(defn- first-match [insts coll]
-  (success (run (init-state insts coll))))
-
 (defn- longest-match [insts coll]
   (loop [state (init-state insts coll)
          regs (success state)]
