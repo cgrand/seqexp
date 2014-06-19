@@ -109,25 +109,22 @@
   "Matches either of its arguments."
   ([e] e)
   ([e & es]
-    (->Pattern
-      (asm
-        fork>  l1
-        include e
-        jump    l2
-        label   l1
-        include (apply | es)
-        label   l2))))
+    (asmpat
+      fork>  l1
+      include e
+      jump    l2
+      label   l1
+      include (apply | es)
+      label   l2)))
 
 (defn as
   "Like cat but saves the match as a group under the specified name.
    (:match and :rest are reserved names)."
   [name e & es]
-  (let [es (apply cat e es)]
-    (->Pattern
-      (asm
-        save    [name :from]
-        include es
-        save    [name :to]))))
+  (asmpat
+    save    [name :from]
+    include (apply cat e es)
+    save    [name :to]))
 
 (def _ "Matches anything" (constantly true))
 
