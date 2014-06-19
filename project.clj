@@ -1,7 +1,6 @@
-(defproject regex2 "0.1.0-SNAPSHOT"
+(defproject net.cgrand/seqexp "0.1.0"
   :description "FIXME: write description"
-  :url "http://example.com/FIXME"
+  :url "http://github.com/cgrand/seqexp"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
-  :dependencies [[org.clojure/clojure "1.6.0"]
-                 [n01se/seqex "2.0.1"]])
+  :dependencies [[org.clojure/clojure "1.6.0"]])

@@ -3,7 +3,7 @@
   (:refer-clojure :exclude [+ * repeat])
   (require [clojure.walk :as walk]))
 
-(defprotocol Regex
+(defprotocol ^:private Regex
   (instructions [re]))
 
 (defn- link
@@ -43,14 +43,16 @@
     (asm
       pred f)))
 
-(defrecord Pattern [ops]
+(defrecord ^:private Pattern [ops]
   Regex
   (instructions [pat] ops))
 
 (defmacro ^:private asmpat [& exprs]
   `(->Pattern (link (asm ~@exprs))))
 
-(defn cat [e & es]
+(defn cat 
+  "Concatenates several seqexps into one."
+  [e & es]
   (->Pattern (mapcat instructions (cons e es))))
 
 (defmacro ^:private decline [decls & forms]
@@ -59,7 +61,10 @@
      ~@(walk/postwalk #(decls % %) forms)))
 
 (decline {* *? + +? ? ?? repeat repeat? fork> fork< fork< fork> :fork> :fork< :fork< :fork>}
-  (defn * [e & es]
+  (defn *
+    "Matches its a body zero or more times.
+     Exists in greedy (*) and reluctant (*?) variants."
+    [e & es]
     (asmpat
       label   start
       fork>   end
@@ -67,19 +72,27 @@
       jump    start
       label   end))
 
-  (defn + [e & es]
+  (defn +
+    "Matches its a body one or more times.
+     Exists in greedy (+) and reluctant (+?) variants."
+    [e & es]
     (asmpat
       label   start
       include (apply cat e es)
       fork<   start))
 
-  (defn ? [e & es]
+  (defn ?
+    "Matches its a body zero or once.
+     Exists in greedy (?) and reluctant (??) variants."
+    [e & es]
     (asmpat
       fork>   end
       include (apply cat e es)
       label   end))
 
   (defn repeat
+    "Matches its a body min to max times (inclusive).
+     Exists in greedy (repeat) and reluctant (repeat?) variants."
     ([max e]
       (repeat 0 max e))
     ([min max e]
@@ -92,7 +105,8 @@
             (conj ops [:label end])
             (link ops)))))))
 
-(defn | 
+(defn |
+  "Matches either of its arguments."
   ([e] e)
   ([e & es]
     (->Pattern
@@ -104,7 +118,10 @@
         include (apply | es)
         label   l2))))
 
-(defn as [name e & es]
+(defn as
+  "Like cat but saves the match as a group under the specified name.
+   (:match and :rest are reserved names)."
+  [name e & es]
   (let [es (apply cat e es)]
     (->Pattern
       (asm
@@ -112,7 +129,7 @@
         include es
         save    [name :to]))))
 
-(def _ (constantly true))
+(def _ "Matches anything" (constantly true))
 
 (def ^:private ^:const no-threads [{} []])
 
