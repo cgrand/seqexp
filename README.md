@@ -32,6 +32,7 @@ And have fun:
 => (se/exec
      (se/cat (se/* odd?) 7)
      [1 3 3 7 7 9])
+
 {:rest (9), :match (1 3 3 7 7)}
 ```
 
@@ -40,14 +41,47 @@ And have fun:
    and :rest, corresponding to the matched sub sequence and the rest of the
    input sequence.)
 
+Named groups are introduced with `as`:
 
-A more complex example:
+```clj
+=> (se/exec
+        (se/cat (se/as :odds-before-7 (se/* odd?)) 7)
+        [1 3 3 7 7 9])
+
+{:rest (9), :odds-before-7 (1 3 3 7), :match (1 3 3 7 7)}
+```
+
+What about the difference between greedy and reluctant quantifiers?
+
+```clj
+=> (se/exec
+        (se/* (se/cat (se/as :odds-before-7 (se/* odd?)) 7))
+        [1 3 3 7 1 3 3 7])
+
+{:rest (), :odds-before-7 (1 3 3 7 1 3 3), :match (1 3 3 7 1 3 3 7)}
+
+=> (se/exec
+        (se/* (se/cat (se/as :odds-before-7 (se/*? odd?)) 7))
+        [1 3 3 7 1 3 3 7])
+
+{:rest (), :odds-before-7 (1 3 3), :match (1 3 3 7 1 3 3 7)}
+```
+
+In the above example we see that in the first case the inner `*` matches as much as possible while in the second case `*?` matches as little as possible.
+
+Greediness affects only submatches and never changes the whole match.
+
+
+
+Now, a more complex example:
 
 ```clj
 ;; match a defn-like body (including name, optional docstring, optional metadata
 ;; and multiple arities)
 => (def args+body (se/cat vector? (se/* se/_)))
+
 #'playground/args+body
+
 => (se/exec
      (se/cat
        (se/as :name symbol?)
@@ -60,6 +94,7 @@ A more complex example:
      '(fn-name "some-doc" {:meta :data}
         ([a] ...)
         ([a b] ...)))
+
 {:rest (), :match (fn-name "some-doc" {:meta :data} ([a] ...) ([a b] ...)),
  :bodies (([a] ...) ([a b] ...)),
  :name (fn-name),
@@ -72,6 +107,7 @@ Lazy-friendliness:
 ```clj
 ;; proof that the whole infinite seq is not consumed
 => (:match (se/exec (se/* #(< % 10)) (range)))
+
 (0 1 2 3 4 5 6 7 8 9)
 ```
 
