@@ -35,6 +35,12 @@ And have fun:
 {:rest (9), :match (1 3 3 7 7)}
 ```
 
+(`exec` returns either nil on failure or a map of
+   group names to matched sub-sequences. They are two special groups: :match
+   and :rest, corresponding to the matched sub sequence and the rest of the
+   input sequence.)
+
+
 A more complex example:
 
 ```clj
