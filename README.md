@@ -136,7 +136,7 @@ Forks the current thread in two threads, one thread will continue to the next in
 
 The difference between `FORK>` and `FORK<` is the relative priority of the two resulting threads: `FORK>` gives priority to the continuing thread while `FORK<` gives priority to the jumping thread.
 
-It should be noted that the only effect of this *priority* is submatch selection: when a match is found, its the highest-priority thread amongst the successful thread that gets to pick the submatches (groups). It follows that priority doesn't change the whole match.
+It should be noted that the only effect of this *priority* is submatch selection: when a match is found, the highest-priority thread amongst the successful threads gets to pick the submatches (groups). It follows that priority can't change the whole match.
 
 ### SAVE register-name
 Saves the current position to the specified register.
