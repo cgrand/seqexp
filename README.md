@@ -8,14 +8,15 @@ Seqexp salient features are:
 * lazy-friendly (doesn't consume the whole seq when possible)
 * named groups using `as` (in addition to default groups: `:match` and `:rest`)
 * greedy (`*`, `+`, `?`, `repeat`) and reluctant quantifiers (`*?`, `+?`, `??`, `repeat?`)
-* short and sweet codebase (~200LOC)
+* separated quantifiers (`*'`, `+'` and `repeat'` -- also available in reluctant versions): they take an additional separator expression
+* short and sweet codebase (~220LOC)
 
 ## Usage
 
 Add this dependency to your project.
 
 ```clj
-[net.cgrand/seqexp "0.1.0"]
+[net.cgrand/seqexp "0.2.0"]
 ```
 
 Require it as:
@@ -151,6 +152,12 @@ PRED  odd?
 JUMP  -2
 PRED  #(= 7 %)
 ```
+
+## Changes
+### 0.2.0
+
+* `(repeat n e)` now matches `e` repeated *exactly* n times (and not upto n times)
+* separated variants of `*`, `+` and `repeat`: `*'`, `+'` and `repeat'` (reluctant versions: `*'?`, `+'?` and `repeat'?`).
 
 ## License
 

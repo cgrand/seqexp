@@ -1,6 +1,6 @@
 (ns net.cgrand.seqexp
   "Regular expressions for sequences."
-  (:refer-clojure :exclude [+ * repeat])
+  (:refer-clojure :exclude [+ * repeat +' *'])
   (require [clojure.walk :as walk]))
 
 (defprotocol ^:private Regex
@@ -60,7 +60,9 @@
      ~@forms 
      ~@(walk/postwalk #(decls % %) forms)))
 
-(decline {* *? + +? ? ?? repeat repeat? fork> fork< fork< fork> :fork> :fork< :fork< :fork>}
+(decline {* *? + +? ? ?? repeat repeat?
+          *' *'? +' +'? repeat' repeat'?
+          fork> fork< fork< fork> :fork> :fork< :fork< :fork>}
   (defn *
     "Matches its body zero or more times.
      Exists in greedy (*) and reluctant (*?) variants."
@@ -99,6 +101,35 @@
       (cond
         (pos? min) (cat (apply cat (clojure.core/repeat min e)) (repeat 0 (- max min) e))
         (pos? max) (? e (repeat 0 (dec max) e))
+        :else (asmpat))))
+
+  (defn +'
+    "Matches its body one or more times separated by sep.
+     Exists in greedy (+') and reluctant (+'?) variants."
+    [sep e & es]
+    (asmpat
+      jump    start
+      label   loop
+      include sep
+      label   start
+      include (apply cat e es)
+      fork<   loop))
+
+  (defn *'
+    "Matches its body zero or more times, separated by sep.
+     Exists in greedy (*') and reluctant (*'?) variants."
+    [sep e & es]
+    (? (apply +' e es)))
+
+  (defn repeat'
+    "Matches its body min to max times (inclusive) separated by sep.
+     Exists in greedy (repeat') and reluctant (repeat'?) variants."
+    ([n sep e]
+      (repeat' n n e))
+    ([min max sep e]
+      (cond
+        (pos? min) (cat e (repeat (dec min) (dec max) (cat sep e)))
+        (pos? max) (? (repeat' 1 max e))
         :else (asmpat)))))
 
 (defn |
