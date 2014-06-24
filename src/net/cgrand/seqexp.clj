@@ -93,17 +93,13 @@
   (defn repeat
     "Matches its body min to max times (inclusive).
      Exists in greedy (repeat) and reluctant (repeat?) variants."
-    ([max e]
-      (repeat 0 max e))
+    ([n e]
+      (repeat n n e))
     ([min max e]
-      (->Pattern
-        (let [end (gensym :end)
-              insts (instructions e)]
-          (as-> [] ops
-            (reduce into ops (clojure.core/repeat min insts))
-            (reduce into ops (clojure.core/repeat (- max min) (cons [:fork> end] insts)))
-            (conj ops [:label end])
-            (link ops)))))))
+      (cond
+        (pos? min) (cat (apply cat (clojure.core/repeat min e)) (repeat 0 (- max min) e))
+        (pos? max) (? e (repeat 0 (dec max) e))
+        :else (asmpat)))))
 
 (defn |
   "Matches either of its arguments."
