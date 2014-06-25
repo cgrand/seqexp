@@ -179,13 +179,13 @@
       (save1 [reg v1] (reg2 init nil v1))
       (fetch [reg] init))))
 
-(defn reduce-occurences [f init]
+(defn reduce-occurrences [f init]
   (register (fn [acc [from & s] [to]]
               (f acc (take (- to from) s))) init))
 
-(def last-occurence (reduce-occurences (fn [_ x] x) nil))
+(def last-occurrence (reduce-occurrences (fn [_ x] x) nil))
 
-(def all-occurences (reduce-occurences conj []))
+(def all-occurrences (reduce-occurrences conj []))
 
 (def unmatched-rest (register (fn [_ _ [_ & s]] s) nil))
 
@@ -202,10 +202,10 @@
                   (add-thread (clojure.core/+ pc arg) pos registers insts)
                   (add-thread (inc pc) pos registers insts))
         :save0 (recur threads (inc pc) pos
-                 (assoc registers arg (save0 (registers arg last-occurence) pos))
+                 (assoc registers arg (save0 (registers arg last-occurrence) pos))
                  insts)
         :save1 (recur threads (inc pc) pos
-                 (assoc registers arg (save1 (registers arg last-occurence) pos))
+                 (assoc registers arg (save1 (registers arg last-occurrence) pos))
                  insts)
         (:pred nil) [(assoc ctxs pc registers) (conj pcs pc)]))))
 
