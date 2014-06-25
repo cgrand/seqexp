@@ -119,7 +119,7 @@
     "Matches its body zero or more times, separated by sep.
      Exists in greedy (*') and reluctant (*'?) variants."
     [sep e & es]
-    (? (apply +' e es)))
+    (? (apply +' sep e es)))
 
   (defn repeat'
     "Matches its body min to max times (inclusive) separated by sep.
@@ -129,7 +129,7 @@
     ([min max sep e]
       (cond
         (pos? min) (cat e (repeat (dec min) (dec max) (cat sep e)))
-        (pos? max) (? (repeat' 1 max e))
+        (pos? max) (? (repeat' 1 max sep e))
         :else (asmpat)))))
 
 (defn |

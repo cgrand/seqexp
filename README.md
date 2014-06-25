@@ -16,7 +16,7 @@ Seqexp salient features are:
 Add this dependency to your project.
 
 ```clj
-[net.cgrand/seqexp "0.2.0"]
+[net.cgrand/seqexp "0.2.1"]
 ```
 
 Require it as:
