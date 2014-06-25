@@ -10,9 +10,9 @@
   "(idempotent)"
   [instructions]
   (let [[insts labels] (reduce (fn [[insts labels] [op arg :as inst]]
-                               (if (= :label op)
-                                 [insts (assoc labels arg (count insts))]
-                                 [(conj insts inst) labels]))
+                                 (if (= :label op)
+                                   [insts (assoc labels arg (count insts))]
+                                   [(conj insts inst) labels]))
                          [[] {}] instructions)]
     (mapv (fn [[op arg :as inst] pc]
             (case op
@@ -31,7 +31,7 @@
                (case op
                  (label jump fork> fork<) [[(keyword op) (list gen (keyword arg))]]
                  include `(instructions ~arg)
-                 (pred save) [[(keyword op) arg]]))
+                 (pred save0 save1) [[(keyword op) arg]]))
              exprs)))))
 
 (extend-protocol Regex
@@ -50,14 +50,14 @@
 (defmacro ^:private asmpat [& exprs]
   `(->Pattern (link (asm ~@exprs))))
 
-(defn cat 
+(defn cat
   "Concatenates several seqexps into one."
   [e & es]
   (->Pattern (mapcat instructions (cons e es))))
 
 (defmacro ^:private decline [decls & forms]
   `(do
-     ~@forms 
+     ~@forms
      ~@(walk/postwalk #(decls % %) forms)))
 
 (decline {* *? + +? ? ?? repeat repeat?
@@ -70,7 +70,7 @@
     (asmpat
       label   start
       fork>   end
-      include (apply cat e es) 
+      include (apply cat e es)
       jump    start
       label   end))
 
@@ -149,13 +149,45 @@
    (:match and :rest are reserved names)."
   [name e & es]
   (asmpat
-    save    [name :from]
+    save0    name
     include (apply cat e es)
-    save    [name :to]))
+    save1    name))
 
 (def _ "Matches anything" (constantly true))
 
 (def ^:private ^:const no-threads [{} []])
+
+(defprotocol Register
+  (save0 [reg v])
+  (save1 [reg v])
+  (fetch [reg]))
+
+(defn register [f init]
+  (letfn [(reg1 [acc v0]
+            (reify Register
+              (save0 [reg v0] (reg1 acc v0))
+              (save1 [reg v1] (reg2 acc v0 v1))
+              (fetch [reg] acc)))
+         (reg2 [acc v0 v1]
+           (reify Register
+             (save0 [reg v0] (reg1 (fetch reg) v0))
+             (save1 [reg v1] (reg2 acc v0 v1))
+             (fetch [reg]
+               (f acc v0 v1))))]
+    (reify Register
+      (save0 [reg v0] (reg1 init v0))
+      (save1 [reg v1] (reg2 init nil v1))
+      (fetch [reg] init))))
+
+(defn reduce-occurences [f init]
+  (register (fn [acc [from & s] [to]]
+              (f acc (take (- to from) s))) init))
+
+(def last-occurence (reduce-occurences (fn [_ x] x) nil))
+
+(def all-occurences (reduce-occurences conj []))
+
+(def unmatched-rest (register (fn [_ _ [_ & s]] s) nil))
 
 (defn- add-thread [[ctxs pcs :as threads] pc pos registers insts]
   (if (ctxs pc)
@@ -169,7 +201,12 @@
         :fork< (-> threads
                   (add-thread (clojure.core/+ pc arg) pos registers insts)
                   (add-thread (inc pc) pos registers insts))
-        :save (recur threads (inc pc) pos (assoc registers arg pos) insts)
+        :save0 (recur threads (inc pc) pos
+                 (assoc registers arg (save0 (registers arg last-occurence) pos))
+                 insts)
+        :save1 (recur threads (inc pc) pos
+                 (assoc registers arg (save1 (registers arg last-occurence) pos))
+                 insts)
         (:pred nil) [(assoc ctxs pc registers) (conj pcs pc)]))))
 
 (defn- run [[insts idx xs [ctxs pcs]]]
@@ -193,11 +230,11 @@
 (defn- success [[insts _ _ [ctxs]]]
   (ctxs (count insts)))
 
-(defn- init-state [insts coll]
-  [insts 0 coll (add-thread no-threads 0 (cons 0 coll) {} insts)])
+(defn- init-state [insts coll regs]
+  [insts 0 coll (add-thread no-threads 0 (cons 0 coll) regs insts)])
 
-(defn- longest-match [insts coll]
-  (loop [state (init-state insts coll)
+(defn- longest-match [insts coll regs]
+  (loop [state (init-state insts coll regs)
          regs (success state)]
     (let [state (run state)]
       (if-let [regs (success state)]
@@ -206,18 +243,16 @@
 
 (defn- groups [registers]
   (when registers
-    (into {:rest (rest (registers [:rest]))}
-      (for [[[k end] [from-idx & s]] registers
-            :when (= end :from)
-            :let [[to-idx] (registers [k :to])]]
-        [k (take (- to-idx from-idx) s)]))))
+    (reduce-kv (fn [groups name reg] (assoc groups name (fetch reg)))
+      registers registers)))
 
 (defn exec
   "Executes the regular expression, returns either nil on failure or a map of
    group names to matched sub-sequences. They are two special groups: :match
    and :rest, corresponding to the matched sub sequence and the rest of the
    input sequence."
-  [re coll]
-  (groups (longest-match (link (concat
-                                 (instructions (as :match re))
-                                 (asm save [:rest]))) coll)))
+  [re coll & {grps :groups}]
+  (groups (longest-match (link (asm
+                                 include (as :match re)
+                                 save1 :rest))
+            coll (into {:rest unmatched-rest} grps))))
