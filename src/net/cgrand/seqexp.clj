@@ -7,7 +7,8 @@
   (instructions [re]))
 
 (defn- link
-  "(idempotent)"
+  "Resolve labels to addresses.
+   (idempotent)"
   [instructions]
   (let [[insts labels] (reduce (fn [[insts labels] [op arg :as inst]]
                                  (if (= :label op)
