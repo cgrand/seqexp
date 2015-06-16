@@ -32,7 +32,7 @@
                (case op
                  (label jump fork> fork<) [[(keyword op) (list gen (keyword arg))]]
                  include `(instructions ~arg)
-                 (pred save0 save1) [[(keyword op) arg]]))
+                 (pred save0 save1 sub) [[(keyword op) arg]]))
              exprs)))))
 
 (extend-protocol Regex
@@ -208,7 +208,7 @@
         :save1 (recur threads (inc pc) pos
                  (assoc registers arg (save1 (registers arg last-occurrence) pos))
                  insts)
-        (:pred nil) [(assoc ctxs pc registers) (conj pcs pc)]))))
+        (:pred :sub nil) [(assoc ctxs pc registers) (conj pcs pc)]))))
 
 (defn- run [[insts idx xs [ctxs pcs]]]
   (let [N (count insts)]
@@ -224,7 +224,10 @@
                         (case op
                           :pred (if (arg x)
                                   (add-thread threads (inc pc) (cons idx xs) registers insts)
-                                  threads))))
+                                  threads)
+                          :sub (if-let [registers (arg x registers)]
+                                 (add-thread threads (inc pc) (cons idx xs) registers insts)
+                                 threads))))
               no-threads pcs)))
         [insts idx xs [ctxs pcs]]))))
 
@@ -241,6 +244,13 @@
       (if-let [regs (success state)]
         (recur state regs)
         regs))))
+
+(defn sub [guard & es]
+  (asmpat
+    sub (let [insts (link (instructions (apply cat es)))]
+          (fn [x regs]
+            (when-let [coll (guard x)]
+              (longest-match insts coll regs))))))
 
 (defn- groups [registers]
   (when registers
