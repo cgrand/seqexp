@@ -163,6 +163,11 @@
   (save1 [reg v])
   (fetch [reg]))
 
+(defprotocol RegisterBank
+  (store0 [bank id v])
+  (store1 [bank id v])
+  (fetch-all [bank]))
+
 (defn register [f init]
   (letfn [(reg1 [acc v0]
             (reify Register
@@ -190,6 +195,16 @@
 
 (def unmatched-rest (register (fn [_ _ [_ & s]] s) nil))
 
+(extend-protocol RegisterBank
+  clojure.lang.APersistentMap
+  (store0 [bank id v]
+    (assoc bank id (save0 (bank id last-occurrence) v)))
+  (store1 [bank id v]
+    (assoc bank id (save1 (bank id last-occurrence) v)))
+  (fetch-all [bank]
+    (reduce-kv (fn [groups name reg] (assoc groups name (fetch reg)))
+      bank bank)))
+
 (defn- add-thread [[ctxs pcs :as threads] pc pos registers insts]
   (if (ctxs pc)
     threads
@@ -203,10 +218,10 @@
                   (add-thread (clojure.core/+ pc arg) pos registers insts)
                   (add-thread (inc pc) pos registers insts))
         :save0 (recur threads (inc pc) pos
-                 (assoc registers arg (save0 (registers arg last-occurrence) pos))
+                 (store0 registers arg pos)
                  insts)
         :save1 (recur threads (inc pc) pos
-                 (assoc registers arg (save1 (registers arg last-occurrence) pos))
+                 (store1 registers arg pos)
                  insts)
         (:pred :sub nil) [(assoc ctxs pc registers) (conj pcs pc)]))))
 
@@ -252,10 +267,8 @@
             (when-let [coll (guard x)]
               (longest-match insts coll regs))))))
 
-(defn- groups [registers]
-  (when registers
-    (reduce-kv (fn [groups name reg] (assoc groups name (fetch reg)))
-      registers registers)))
+(defn- groups [bank]
+  (when bank (fetch-all bank)))
 
 (defn exec
   "Executes the regular expression, returns either nil on failure or a map of
