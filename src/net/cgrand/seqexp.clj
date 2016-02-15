@@ -196,6 +196,8 @@
 (def unmatched-rest (register (fn [_ _ [_ & s]] s) nil))
 
 (extend-protocol RegisterBank
+  nil
+  (fetch-all [bank] nil)
   clojure.lang.APersistentMap
   (store0 [bank id v]
     (assoc bank id (save0 (bank id last-occurrence) v)))
@@ -204,6 +206,45 @@
   (fetch-all [bank]
     (reduce-kv (fn [groups name reg] (assoc groups name (fetch reg)))
       bank bank)))
+
+(defn hierarchical-bank [f init]
+  (letfn [(bank0 []
+            (reify RegisterBank
+              (store0 [bank path v0] (bank1 {} init v0))
+              #_(store1 [bank path v1] (bank2 {} init nil v1))
+              (fetch-all [bank] init)))
+          (bank1 [children acc v0']
+            (reify RegisterBank
+              (store0 [bank path v0]
+                (if-some [[x & xs] (seq path)]
+                  (bank1 (assoc children x (store0 (or (children x) (bank0)) xs v0)) acc v0')
+                  (bank1 {} acc v0)))
+              (store1 [bank path v1]
+                (if-some [[x & xs] (seq path)]
+                  (bank1 (assoc children x (store1 (children x) xs v1)) acc v0')
+                  (bank2 children acc v0' v1)))
+              (fetch-all [reg] acc)))
+          (bank2 [children acc v0' v1']
+            (reify RegisterBank
+              (store0 [bank path v0]
+                (if-some [[x & xs] (seq path)]
+                  (bank1 (assoc children x (store0 (or (children x) (bank0)) xs v0)) acc v0')
+                  (bank1 {} (fetch-all bank) v0)))
+              (store1 [bank path v1]
+                (if-some [[x & xs] (seq path)]
+                  (bank2 (assoc children x (store1 (children x) xs v1)) acc v0' v1')
+                  (bank2 children acc v0' v1)))
+              (fetch-all [reg]
+                (f acc v0' v1' (reduce-kv (fn [m k bank]
+                                            (assoc m k (fetch-all bank))) children children)))))]
+    (reify RegisterBank
+      (store0 [bank path v0] (bank1 {} init v0))
+      #_(store1 [bank path v1] (bank2 {} init nil v1))
+      (fetch-all [bank] init))))
+
+(defn tree-bank [mk-node]
+  (hierarchical-bank (fn [acc [from & s] [to] children]
+                       (conj acc (mk-node (take (- to from) s) children))) []))
 
 (defn- add-thread [[ctxs pcs :as threads] pc pos registers insts]
   (if (ctxs pc)
@@ -267,16 +308,23 @@
             (when-let [coll (guard x)]
               (longest-match insts coll regs))))))
 
-(defn- groups [bank]
-  (when bank (fetch-all bank)))
-
 (defn exec
   "Executes the regular expression, returns either nil on failure or a map of
    group names to matched sub-sequences. They are two special groups: :match
    and :rest, corresponding to the matched sub sequence and the rest of the
    input sequence."
   [re coll & {grps :groups}]
-  (groups (longest-match (link (asm
-                                 include (as :match re)
-                                 save1 :rest))
-            coll (into {:rest unmatched-rest} grps))))
+  (fetch-all (longest-match (link (asm
+                                    include (as :match re)
+                                    save1 :rest))
+               coll (into {:rest unmatched-rest} grps))))
+
+(defn lift-tree
+  "Executes the regular expression, returns either nil on failure or a tree built out of named groups.
+   Group names MUST be vectors."
+  ([re coll]
+    (lift-tree #(assoc %2 :match %1) re coll))
+  ([mk-node re coll]
+    (fetch-all
+      (longest-match (link (asm include (as [] re)))
+        coll (tree-bank mk-node)))))

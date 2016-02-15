@@ -154,6 +154,24 @@ PRED  #(= 7 %)
 ```
 
 ## Changes
+### master
+
+* `lift-tree` which in conjuction with hierarchical group names allows to recreate a tree out of groups:
+```clj
+=> (se/lift-tree
+     (se/* 
+       (se/as [:sections]
+         (se/cat :h1
+           (se/as [:sections :ps]
+             (se/+ :p)))))
+     [:h1 :p :h1 :p :p :p])
+
+[{:match (:h1 :p :h1 :p :p :p),
+  :sections
+  [{:match (:h1 :p), :ps [{:match (:p)}]}
+   {:match (:h1 :p :p :p), :ps [{:match (:p :p :p)}]}]}]
+```
+
 ### 0.2.0
 
 * `(repeat n e)` now matches `e` repeated *exactly* n times (and not upto n times)
