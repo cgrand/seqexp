@@ -158,31 +158,26 @@
 
 (def ^:private ^:const no-threads [{} []])
 
-(defprotocol Register
-  (save0 [reg v])
-  (save1 [reg v])
-  (fetch [reg]))
-
 (defprotocol RegisterBank
-  (store0 [bank id v])
-  (store1 [bank id v])
-  (fetch-all [bank]))
+  (save0 [bank id v])
+  (save1 [bank id v])
+  (fetch [bank]))
 
 (defn register [f init]
   (letfn [(reg1 [acc v0]
-            (reify Register
-              (save0 [reg v0] (reg1 acc v0))
-              (save1 [reg v1] (reg2 acc v0 v1))
+            (reify RegisterBank
+              (save0 [reg _ v0] (reg1 acc v0))
+              (save1 [reg _ v1] (reg2 acc v0 v1))
               (fetch [reg] acc)))
          (reg2 [acc v0 v1]
-           (reify Register
-             (save0 [reg v0] (reg1 (fetch reg) v0))
-             (save1 [reg v1] (reg2 acc v0 v1))
+           (reify RegisterBank
+             (save0 [reg _ v0] (reg1 (fetch reg) v0))
+             (save1 [reg _ v1] (reg2 acc v0 v1))
              (fetch [reg]
                (f acc v0 v1))))]
-    (reify Register
-      (save0 [reg v0] (reg1 init v0))
-      (save1 [reg v1] (reg2 init nil v1))
+    (reify RegisterBank
+      (save0 [reg _ v0] (reg1 init v0))
+      (save1 [reg _ v1] (reg2 init nil v1))
       (fetch [reg] init))))
 
 (defn reduce-occurrences [f init]
@@ -197,50 +192,49 @@
 
 (extend-protocol RegisterBank
   nil
-  (fetch-all [bank] nil)
+  (fetch [m] nil)
   clojure.lang.APersistentMap
-  (store0 [bank id v]
-    (assoc bank id (save0 (bank id last-occurrence) v)))
-  (store1 [bank id v]
-    (assoc bank id (save1 (bank id last-occurrence) v)))
-  (fetch-all [bank]
-    (reduce-kv (fn [groups name reg] (assoc groups name (fetch reg)))
-      bank bank)))
+  (save0 [m id v]
+    (assoc m id (save0 (m id last-occurrence) nil v)))
+  (save1 [m id v]
+    (assoc m id (save1 (m id last-occurrence) nil v)))
+  (fetch [m]
+    (reduce-kv (fn [groups name reg] (assoc groups name (fetch reg))) m m)))
 
 (defn hierarchical-bank [f init]
   (letfn [(bank0 []
             (reify RegisterBank
-              (store0 [bank path v0] (bank1 {} init v0))
-              #_(store1 [bank path v1] (bank2 {} init nil v1))
-              (fetch-all [bank] init)))
+              (save0 [bank path v0] (bank1 {} init v0))
+              #_(save1 [bank path v1] (bank2 {} init nil v1))
+              (fetch [bank] init)))
           (bank1 [children acc v0']
             (reify RegisterBank
-              (store0 [bank path v0]
+              (save0 [bank path v0]
                 (if-some [[x & xs] (seq path)]
-                  (bank1 (assoc children x (store0 (or (children x) (bank0)) xs v0)) acc v0')
+                  (bank1 (assoc children x (save0 (or (children x) (bank0)) xs v0)) acc v0')
                   (bank1 {} acc v0)))
-              (store1 [bank path v1]
+              (save1 [bank path v1]
                 (if-some [[x & xs] (seq path)]
-                  (bank1 (assoc children x (store1 (children x) xs v1)) acc v0')
+                  (bank1 (assoc children x (save1 (children x) xs v1)) acc v0')
                   (bank2 children acc v0' v1)))
-              (fetch-all [reg] acc)))
+              (fetch [reg] acc)))
           (bank2 [children acc v0' v1']
             (reify RegisterBank
-              (store0 [bank path v0]
+              (save0 [bank path v0]
                 (if-some [[x & xs] (seq path)]
-                  (bank1 (assoc children x (store0 (or (children x) (bank0)) xs v0)) acc v0')
-                  (bank1 {} (fetch-all bank) v0)))
-              (store1 [bank path v1]
+                  (bank1 (assoc children x (save0 (or (children x) (bank0)) xs v0)) acc v0')
+                  (bank1 {} (fetch bank) v0)))
+              (save1 [bank path v1]
                 (if-some [[x & xs] (seq path)]
-                  (bank2 (assoc children x (store1 (children x) xs v1)) acc v0' v1')
+                  (bank2 (assoc children x (save1 (children x) xs v1)) acc v0' v1')
                   (bank2 children acc v0' v1)))
-              (fetch-all [reg]
+              (fetch [reg]
                 (f acc v0' v1' (reduce-kv (fn [m k bank]
-                                            (assoc m k (fetch-all bank))) children children)))))]
+                                            (assoc m k (fetch bank))) children children)))))]
     (reify RegisterBank
-      (store0 [bank path v0] (bank1 {} init v0))
-      #_(store1 [bank path v1] (bank2 {} init nil v1))
-      (fetch-all [bank] init))))
+      (save0 [bank path v0] (bank1 {} init v0))
+      #_(save1 [bank path v1] (bank2 {} init nil v1))
+      (fetch [bank] init))))
 
 (defn tree-bank [mk-node]
   (hierarchical-bank (fn [acc [from & s] [to] children]
@@ -259,10 +253,10 @@
                   (add-thread (clojure.core/+ pc arg) pos registers insts)
                   (add-thread (inc pc) pos registers insts))
         :save0 (recur threads (inc pc) pos
-                 (store0 registers arg pos)
+                 (save0 registers arg pos)
                  insts)
         :save1 (recur threads (inc pc) pos
-                 (store1 registers arg pos)
+                 (save1 registers arg pos)
                  insts)
         (:pred nil) [(assoc ctxs pc registers) (conj pcs pc)]))))
 
@@ -304,7 +298,7 @@
    and :rest, corresponding to the matched sub sequence and the rest of the
    input sequence."
   [re coll & {grps :groups}]
-  (fetch-all (longest-match (link (asm
+  (fetch (longest-match (link (asm
                                     include (as :match re)
                                     save1 :rest))
                coll (into {:rest unmatched-rest} grps))))
@@ -315,6 +309,6 @@
   ([re coll]
     (lift-tree #(assoc %2 :match %1) re coll))
   ([mk-node re coll]
-    (fetch-all
+    (fetch
       (longest-match (link (asm include (as [] re)))
         coll (tree-bank mk-node)))))
