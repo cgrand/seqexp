@@ -16,7 +16,7 @@ Seqexp salient features are:
 Add this dependency to your project.
 
 ```clj
-[net.cgrand/seqexp "0.2.1"]
+[net.cgrand/seqexp "0.4.0"]
 ```
 
 Require it as:
@@ -154,8 +154,9 @@ PRED  #(= 7 %)
 ```
 
 ## Changes
-### master
+### 0.4.0
 
+* replacement of the `Register` protocol by the `RegisterBank` one, which allows to implement `lift-tree`
 * `lift-tree` which in conjuction with hierarchical group names allows to recreate a tree out of groups:
 ```clj
 => (se/lift-tree
