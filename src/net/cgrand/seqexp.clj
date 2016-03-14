@@ -236,6 +236,17 @@
       #_(save1 [bank path v1] (bank2 {} init nil v1))
       (fetch [bank] init))))
 
+(defn comp-bank [banks]
+  (reify RegisterBank 
+    (save0 [bank [k & ks] v]
+      (comp-bank (update banks k save0 ks v)))
+    (save1 [bank [k & ks] v]
+      (comp-bank (update banks k save1 ks v)))
+    (fetch [bank]
+      (reduce-kv (fn [m k bank]
+                   (assoc m k (fetch bank))) banks
+        banks))))
+
 (defn tree-bank [mk-node]
   (hierarchical-bank (fn [acc [from & s] [to] children]
                        (conj acc (mk-node (take (- to from) s) children))) []))
@@ -308,12 +319,28 @@
                                     save1 :rest))
                coll (into {:rest unmatched-rest} grps))))
 
-(defn lift-tree
-  "Executes the regular expression, returns either nil on failure or a tree built out of named groups.
+(defn- map-registers [re f]
+  (->Pattern
+    (into [] 
+      (map (fn [[op arg :as inst]]
+             (case op
+               (:save0 :save1) [op (f arg)]
+               inst)))
+     (instructions re))))
+
+(defn exec-tree
+  "Executes the regular expression, returns either nil on failure or a map with two keys:
+   :match and :rest. Under :match is found a tree built out of named groups.
    Group names MUST be vectors."
   ([re coll]
-    (lift-tree #(assoc %2 :match %1) re coll))
+    (exec-tree #(assoc %2 :match %1) re coll))
   ([mk-node re coll]
     (fetch
-      (longest-match (link (asm include (as [] re)))
-        coll (tree-bank mk-node)))))
+      (longest-match (link (asm
+                            include (map-registers (as [] re) #(into [:match] %))
+                            save1 [:rest]))
+       coll (comp-bank
+              {:rest unmatched-rest
+               :match (tree-bank mk-node)})))))
+
+
