@@ -260,7 +260,12 @@
                  insts)
         (:pred nil) [(assoc ctxs pc registers) (conj pcs pc)]))))
 
-(defn- run [[insts idx xs [ctxs pcs]]]
+(defn- run
+  "Runs a regex until one of these 3 conditions is met:
+ * input is exhausted
+ * accept state reached
+ * failed (an accept state can't be reached even with additional input)."
+  [[insts idx xs [ctxs pcs]]]
   (let [N (count insts)]
     (loop [idx idx, xs (seq xs)
            [ctxs pcs] [(dissoc ctxs N)
