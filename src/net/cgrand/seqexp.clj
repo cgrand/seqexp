@@ -251,25 +251,28 @@
   (hierarchical-bank (fn [acc [from & s] [to] children]
                        (conj acc (mk-node (take (- to from) s) children))) []))
 
-(defn- add-thread [[ctxs pcs :as threads] pc pos registers insts]
-  (if (ctxs pc)
-    threads
-    (let [[op arg] (nth insts pc nil)]
-      (case op
-        :jump (recur threads (clojure.core/+ pc arg) pos registers insts)
-        :fork> (-> threads
-                 (add-thread (inc pc) pos registers insts)
-                 (add-thread (clojure.core/+ pc arg) pos registers insts))
-        :fork< (-> threads
-                  (add-thread (clojure.core/+ pc arg) pos registers insts)
-                  (add-thread (inc pc) pos registers insts))
-        :save0 (recur threads (inc pc) pos
-                 (save0 registers arg pos)
-                 insts)
-        :save1 (recur threads (inc pc) pos
-                 (save1 registers arg pos)
-                 insts)
-        (:pred nil) [(assoc ctxs pc registers) (conj pcs pc)]))))
+(defn- add-thread [threads pc pos registers insts]
+  (letfn [(add-thread [[ctxs pcs :as threads] pc pos registers visited-pcs]
+            (if (or (ctxs pc) (visited-pcs pc))
+              threads
+              (let [visited-pcs (conj visited-pcs pc)
+                    [op arg] (nth insts pc nil)]
+                (case op
+                  :jump (recur threads (clojure.core/+ pc arg) pos registers visited-pcs)
+                  :fork> (-> threads
+                           (add-thread (inc pc) pos registers visited-pcs)
+                           (add-thread (clojure.core/+ pc arg) pos registers visited-pcs))
+                  :fork< (-> threads
+                           (add-thread (clojure.core/+ pc arg) pos registers visited-pcs)
+                           (add-thread (inc pc) pos registers visited-pcs))
+                  :save0 (recur threads (inc pc) pos
+                           (save0 registers arg pos)
+                           visited-pcs)
+                  :save1 (recur threads (inc pc) pos
+                           (save1 registers arg pos)
+                           visited-pcs)
+                  (:pred nil) [(assoc ctxs pc registers) (conj pcs pc)]))))]
+    (add-thread threads pc pos registers #{})))
 
 (defn- run
   "Runs a regex until one of these 3 conditions is met:

@@ -154,6 +154,28 @@ PRED  #(= 7 %)
 ```
 
 ## Changes
+### 0.5.1
+
+* Dynamic cycle detection:
+
+```clj
+;; before
+=> (exec (* (*? _))
+    [:c :a :b :b :a :c :a :b :b :b :a])
+StackOverflowError   net.cgrand.seqexp/add-thread (seqexp.clj:254)
+```
+
+```clj
+;; now
+=> (exec (* (*? _))
+    [:c :a :b :b :a :c :a :b :b :b :a])
+{:rest nil, :match (:c :a :b :b :a :c :a :b :b :b :a)}
+```
+
+### 0.5.0
+
+* `lift-tree` renamed to `exec-tree` and the original return value is now nested under a `:match` key. Similarly to `exec`, there's now a `:rest` key along the `:match` key.
+
 ### 0.4.0
 
 * replacement of the `Register` protocol by the `RegisterBank` one, which allows to implement `lift-tree`
