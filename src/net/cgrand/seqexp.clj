@@ -288,12 +288,11 @@
         (let [[x & xs] xs, idx (inc idx)]
           (recur idx xs
             (reduce (fn [threads pc]
-                      (let [[op arg] (nth insts pc)
-                            registers (ctxs pc)]
-                        (case op
-                          :pred (if (arg x)
-                                  (add-thread threads (inc pc) (cons idx xs) registers insts)
-                                  threads))))
+                      ; because of (not (contains? ctxs N)) guard above all pcs refers to :pred
+                      (let [[_ pred] (nth insts pc)]
+                        (if (pred x)
+                          (add-thread threads (inc pc) (cons idx xs) (ctxs pc) insts)
+                          threads)))
               no-threads pcs)))
         [insts idx xs [ctxs pcs]]))))
 
