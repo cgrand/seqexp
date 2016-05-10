@@ -280,6 +280,7 @@
                                    (add-nla (clojure.core/+ pc arg) visited-pcs)
                                    (add-nla (inc pc) visited-pcs))
                           (:pred nil) (conj pcs pc)
+                          (:save0 :save1) (recur pcs (inc pc) visited-pcs)
                           :accept (if arg (conj pcs N) pcs))))))
         nla-pcs (into #{} (mapcat add-nla) nla-pcs)]
     (if (nla-pcs N)
