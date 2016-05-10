@@ -298,10 +298,8 @@
                       :fork< (-> threads
                                (add-thread (assoc pc+nla 0 (clojure.core/+ pc arg)) pos registers visited-pcs)
                                (add-thread (assoc pc+nla 0 (inc pc)) pos registers visited-pcs))
-                      :nla (let [nla-pcs (-> (nth pc+nla 1) (add-nla (inc pc) #{}))]
-                             (if (nla-pcs N)
-                               threads
-                               (recur threads [(clojure.core/+ pc arg) nla-pcs] pos registers visited-pcs)))
+                      :nla (let [nla-pcs (-> (nth pc+nla 1) (add-nla (inc pc) #{}) (disj N))] ; N is a removed as performing a negative lookahead with a nullable regex is useless
+                             (recur threads [(clojure.core/+ pc arg) nla-pcs] pos registers visited-pcs))
                       :accept (if arg
                                 [(assoc ctxs (assoc pc+nla 0 N) registers) (conj pcs (assoc pc+nla 0 N))]
                                 threads)
