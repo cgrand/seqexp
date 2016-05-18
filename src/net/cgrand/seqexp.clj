@@ -260,6 +260,96 @@
   (hierarchical-bank (fn [acc [from & s] [to] children]
                        (conj acc (mk-node (take (- to from) s) children))) []))
 
+(defn boot-accepting-vm
+  "Starts an accepting vm. An accepting vm ignore submatches."
+  [insts]
+  (let [N (count insts)
+        ACCEPT [N #{}]]
+    (letfn [(init [pc] (add-threads [[pc #{}]]))
+            (add-threads [threads]
+              (let [visited-pcs (volatile! (transient #{}))]
+                (persistent!
+                  (reduce
+                    (fn add-thread!
+                      ([threads [pc nla-threads]]
+                        (add-thread! threads pc nla-threads))
+                      ([threads pc nla-threads]
+                        (if (@visited-pcs pc)
+                          threads
+                          (do
+                            (vswap! visited-pcs conj! pc)
+                            (let [[op arg] (nth insts pc nil)]
+                              (case op
+                                :jump (recur threads (clojure.core/+ pc arg) nla-threads)
+                                :fork> (-> threads
+                                         (add-thread! (inc pc) nla-threads)
+                                         (recur (clojure.core/+ pc arg) nla-threads))
+                                :fork< (-> threads
+                                         (add-thread! (clojure.core/+ pc arg) nla-threads)
+                                         (recur (inc pc) nla-threads))
+                                (:pred nil) (conj! threads [pc nla-threads])
+                                :nla (recur threads (clojure.core/+ pc arg) (into nla-threads (init (inc pc))))
+                                (:save0 :save1) (recur threads (inc pc) nla-threads)
+                                :accept (if arg (conj! threads [N nla-threads]) threads)))))))
+                         (transient #{}) threads))))]
+    {:init (fn [pc] (add-threads [[pc #{}]]))
+     :step (fn step [threads x]
+             (add-threads (eduction (keep (fn [[pc nla-threads]]
+                                            (when-some [[_ pred] (nth insts pc nil)]
+                                              (when (pred x)
+                                                (let [nla-threads (step nla-threads x)]
+                                                  (when-not (nla-threads ACCEPT)
+                                                    [(inc pc) nla-threads]))))) threads))))
+     :accept? (fn [threads] (contains? threads ACCEPT))})))
+
+(defn- seq-init-pos [s] (cons 0 s))
+(defn- seq-inc-pos [n+s] (cons (inc (first n+s)) (rest (next n+s))))
+
+(defn boot-grouping-vm
+  ([insts regbank] (boot-grouping-vm insts regbank seq-init-pos seq-inc-pos))
+  ([insts regbank init-pos inc-pos]
+    (let [N (count insts)
+          ACCEPT [N #{}]
+          {la-init :init la-step :step la-accept? :accept?} (boot-accepting-vm insts)]
+      (letfn [(init [pc] (add-threads [[pc #{} regbank]]))
+              (add-threads [threads pos]
+                (let [visited-pcs (volatile! (transient #{}))]
+                  [(persistent!
+                     (reduce
+                       (fn add-thread!
+                         ([threads [pc nla-threads bank]]
+                           (add-thread! threads pc nla-threads bank))
+                         ([threads pc nla-threads bank]
+                           (if (@visited-pcs pc)
+                             threads
+                             (do
+                               (vswap! visited-pcs conj! pc)
+                               (let [[op arg] (nth insts pc nil)]
+                                 (case op
+                                   :jump (recur threads (clojure.core/+ pc arg) nla-threads bank)
+                                   :fork> (-> threads
+                                            (add-thread! (inc pc) nla-threads bank)
+                                            (recur (clojure.core/+ pc arg) nla-threads bank))
+                                   :fork< (-> threads
+                                            (add-thread! (clojure.core/+ pc arg) nla-threads bank)
+                                            (recur (inc pc) nla-threads bank))
+                                   (nil :pred) (conj! threads [pc nla-threads bank])
+                                   :nla (recur threads (clojure.core/+ pc arg) (into nla-threads (la-init (inc pc))) bank)
+                                   :save0 (recur threads (inc pc) nla-threads (save0 bank arg pos))
+                                   :save1 (recur threads (inc pc) nla-threads (save1 bank arg pos))
+                                   :accept (if arg (conj! threads [N nla-threads bank]) threads)))))))
+                            (transient []) threads))
+                   (inc-pos pos)]))]
+      {:init (fn [pc s] (add-threads [[pc #{} regbank]] (init-pos s)))
+       :step (fn step [[threads pos] x]
+               (add-threads (eduction (keep (fn [[pc nla-threads bank]]
+                                              (when-some [[_ pred] (nth insts pc nil)]
+                                                (when (pred x)
+                                                  (let [nla-threads (la-step nla-threads x)]
+                                                    (when-not (la-accept? nla-threads)
+                                                      [(inc pc) nla-threads bank]))))) threads)) pos))
+       :accept? (fn [[threads pos]] (some (fn [thread] (when (= ACCEPT (pop thread)) (peek thread))) threads))}))))
+
 (defn- add-thread [threads pc+nla pos registers insts]
   (let [N (count insts)
         [pc nla-pcs] pc+nla
