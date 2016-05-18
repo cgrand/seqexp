@@ -272,30 +272,28 @@
         ACCEPT [N #{}]]
     (letfn [(init [pc] (add-threads [[pc #{}]]))
             (add-threads [threads]
-              (let [visited-pcs (volatile! (transient #{}))]
+              (let [visited-state (volatile! (transient #{}))]
                 (persistent!
                   (reduce
                     (fn add-thread!
-                      ([threads [pc nla-threads]]
-                        (add-thread! threads pc nla-threads))
-                      ([threads pc nla-threads]
-                        (if (@visited-pcs pc)
-                          threads
-                          (do
-                            (vswap! visited-pcs conj! pc)
-                            (let [[op arg] (nth insts pc nil)]
-                              (case op
-                                :jump (recur threads (clojure.core/+ pc arg) nla-threads)
-                                :fork> (-> threads
-                                         (add-thread! (inc pc) nla-threads)
-                                         (recur (clojure.core/+ pc arg) nla-threads))
-                                :fork< (-> threads
-                                         (add-thread! (clojure.core/+ pc arg) nla-threads)
-                                         (recur (inc pc) nla-threads))
-                                (:pred nil) (conj! threads [pc nla-threads])
-                                :nla (recur threads (clojure.core/+ pc arg) (into nla-threads (init (inc pc))))
-                                (:save0 :save1) (recur threads (inc pc) nla-threads)
-                                :accept (if arg (conj! threads [N nla-threads]) threads)))))))
+                      [threads [pc nla-threads :as state]]
+                      (if (@visited-state state)
+                        threads
+                        (do
+                          (vswap! visited-state conj! state)
+                          (let [[op arg] (nth insts pc nil)]
+                            (case op
+                              :jump (recur threads [(clojure.core/+ pc arg) nla-threads])
+                              :fork> (-> threads
+                                       (add-thread! [(inc pc) nla-threads])
+                                       (recur [(clojure.core/+ pc arg) nla-threads]))
+                              :fork< (-> threads
+                                       (add-thread! [(clojure.core/+ pc arg) nla-threads])
+                                       (recur [(inc pc) nla-threads]))
+                              (:pred nil) (conj! threads state)
+                              :nla (recur threads [(clojure.core/+ pc arg) (into nla-threads (init (inc pc)))])
+                              (:save0 :save1) (recur threads [(inc pc) nla-threads])
+                              :accept (if arg (conj! threads [N nla-threads]) threads))))))
                          (transient #{}) threads))))]
     {:init (fn [pc] (add-threads [[pc #{}]]))
      :step (fn step [threads x]
@@ -318,30 +316,30 @@
           {la-init :init la-step :step la-accept? :accept?} (boot-accepting-vm insts)]
       (letfn [(init [pc] (add-threads [[pc #{} regbank]]))
               (add-threads [threads pos]
-                (let [visited-pcs (volatile! (transient #{}))]
+                (let [visited-state (volatile! (transient #{}))]
                   [(persistent!
                      (reduce
                        (fn add-thread!
                          ([threads [pc nla-threads bank]]
-                           (add-thread! threads pc nla-threads bank))
-                         ([threads pc nla-threads bank]
-                           (if (@visited-pcs pc)
+                           (add-thread! threads [pc nla-threads] bank))
+                         ([threads [pc nla-threads :as state] bank]
+                           (if (@visited-state state)
                              threads
                              (do
-                               (vswap! visited-pcs conj! pc)
+                               (vswap! visited-state conj! state)
                                (let [[op arg] (nth insts pc nil)]
                                  (case op
-                                   :jump (recur threads (clojure.core/+ pc arg) nla-threads bank)
+                                   :jump (recur threads [(clojure.core/+ pc arg) nla-threads] bank)
                                    :fork> (-> threads
-                                            (add-thread! (inc pc) nla-threads bank)
-                                            (recur (clojure.core/+ pc arg) nla-threads bank))
+                                            (add-thread! [(inc pc) nla-threads] bank)
+                                            (recur [(clojure.core/+ pc arg) nla-threads] bank))
                                    :fork< (-> threads
-                                            (add-thread! (clojure.core/+ pc arg) nla-threads bank)
-                                            (recur (inc pc) nla-threads bank))
+                                            (add-thread! [(clojure.core/+ pc arg) nla-threads] bank)
+                                            (recur [(inc pc) nla-threads] bank))
                                    (nil :pred) (conj! threads [pc nla-threads bank])
-                                   :nla (recur threads (clojure.core/+ pc arg) (into nla-threads (la-init (inc pc))) bank)
-                                   :save0 (recur threads (inc pc) nla-threads (save0 bank arg pos))
-                                   :save1 (recur threads (inc pc) nla-threads (save1 bank arg pos))
+                                   :nla (recur threads [(clojure.core/+ pc arg) (into nla-threads (la-init (inc pc)))] bank)
+                                   :save0 (recur threads [(inc pc) nla-threads] (save0 bank arg pos))
+                                   :save1 (recur threads [(inc pc) nla-threads] (save1 bank arg pos))
                                    :accept (if arg (conj! threads [N nla-threads bank]) threads)))))))
                             (transient []) threads))
                    (inc-pos pos)]))]
