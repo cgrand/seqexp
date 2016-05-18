@@ -165,6 +165,11 @@
     accept true
     label main))
 
+(defn ?=
+  "Positive lookahead"
+  [& es]
+  (?! (apply ?! es) (* _)))
+
 (def ^:private ^:const no-threads [{} []])
 
 (defprotocol RegisterBank
