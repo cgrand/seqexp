@@ -16,7 +16,7 @@ Seqexp salient features are:
 Add this dependency to your project.
 
 ```clj
-[net.cgrand/seqexp "0.4.0"]
+[net.cgrand/seqexp "0.6.0"]
 ```
 
 Require it as:
@@ -153,7 +153,53 @@ JUMP  -2
 PRED  #(= 7 %)
 ```
 
+
+### Lookahead support
+As of 0.6.0, the above algorithm has been extended to support lookaheads.
+
+Two versions of the vm now exists (one could be enough): the top-level VM which is the `grouping` VM and the nested `accepting` VM which is simpler becauses it ignores registers, it just tells whether we reached an accept state or not. Not having to track submatches mean than thread priority is not needed any more.
+
+Previously threads were identified by their PC alone, now with lookahead support, each thread is identified by a pair: its PC and a nested VM state. Because nested VMs don't track submatches their own whole state is their threads ids set. Nested VMs support lookaheads too (so you can put lookaheads in your lookaheads) so nested thread id are pairs of PC and a nested VM state.
+
+```
+thread-id = [pc, nested-vm-state]
+nested-vm-state = set of thread-id
+top-level-vm-state = (prioritized) map of thread-id to register-bank 
+```
+
+Despite the above definitions _the state space is still bounded_ because the nesting depth is bounded by construction (pathological code exists but can't be produced by a regex/seqexp).
+
+Two new opcodes are added: `NLA` and `ACCEPT`.
+
+`NLA addr` spawns thread `[(inc pc) #{}]` in the nested VM while the current VM jumps at `addr`.
+
+`ACCEPT true` jumps at the end of the program.
+
+`ACCEPT false` (unused) kills the current thread.  
+
+The nested VM is used to perform _negative_ lookahead: if it reaches an accept state (PC at the end of the program and empty nested VM state) then the current thread is killed.
+
+A given thread only needs one nested VM even if it traverses sereval negative lookahead because:
+
+```
+main AND NOT nla1 AND NOT nla2 = main AND NOT (nla1 OR nla2)
+```
+
+Surprisingly _positive lookahead_ comes for free from the decision to supported nested lookaheads:
+
+```
+main AND pla = main AND NOT (NOT pla)
+main AND pla = main AND NOT (true AND NOT pla)
+```
+
+So a positive lookahead is just a negative lookahead inside another negative lookahead!
+
 ## Changes
+
+### 0.6.0
+
+* Lookahead operators `?!` and `?=`.
+
 ### 0.5.1
 
 * Dynamic cycle detection:

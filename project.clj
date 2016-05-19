@@ -1,4 +1,4 @@
-(defproject net.cgrand/seqexp "0.5.1-lookahead"
+(defproject net.cgrand/seqexp "0.6.0-lookahead"
   :description "Regular expressions for sequences."
   :url "http://github.com/cgrand/seqexp"
   :license {:name "Eclipse Public License"
