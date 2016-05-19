@@ -155,7 +155,7 @@ PRED  #(= 7 %)
 
 
 ### Lookahead support
-As of 0.6.0, the Pike and Janson's algorithm has been extended to support lookaheads.
+As of 0.6.0, the [Pike and Janson's algorithm](http://swtch.com/~rsc/regexp/regexp2.html#ahu74) has been extended to support lookaheads.
 
 Two versions of the VM now exists (one could do with only one): the top-level VM which is the `grouping` VM and the nested `accepting` VM which is simpler because it ignores registers (ie it doesn't track match or submatches: it just tells whether we reached an accept state or not). Not having to track submatches mean than thread priority is not needed any more so the whole state of a nested VM is the set of its threads ids.
 
