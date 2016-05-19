@@ -157,7 +157,7 @@ PRED  #(= 7 %)
 ### Lookahead support
 As of 0.6.0, the [Pike and Janson's algorithm](http://swtch.com/~rsc/regexp/regexp2.html#ahu74) has been extended to support lookaheads.
 
-Two versions of the VM now exists (one could do with only one): the top-level VM which is the `grouping` VM and the nested `accepting` VM which is simpler because it ignores registers (ie it doesn't track match or submatches: it just tells whether we reached an accept state or not). Not having to track submatches mean than thread priority is not needed any more so the whole state of a nested VM is the set of its threads ids.
+Two versions of the VM now exists (one could do with only one): the top-level VM which is the `grouping` VM and the nested `accepting` VM which is simpler because it ignores registers (ie it doesn't track match or submatches: it just tells whether an accept state has been reached or not). Not having to track submatches mean than thread priority is not needed any more so the whole state of a nested VM is the set of its threads ids.
 
 Previously threads were identified by their PC alone, now with lookahead support, each thread is identified by a pair: its PC and a nested VM state. Nested VMs support lookaheads too (so you can put lookaheads in your lookaheads) so nested thread ids are pairs of PC and a nested VM state.
 
@@ -175,7 +175,7 @@ One new opcode is added: `NLA`.
 
 The nested VM is used to perform _negative_ lookahead: if it reaches an accept state (PC at the end of the program and empty nested VM state) then the current thread is killed.
 
-A given thread only needs one nested VM even if it traverses sereval negative lookahead because:
+A given thread only needs one nested VM even if it traverses several negative lookaheads because:
 
 ```
 main AND NOT nla1 AND NOT nla2 = main AND NOT (nla1 OR nla2)
