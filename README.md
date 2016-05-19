@@ -155,9 +155,9 @@ PRED  #(= 7 %)
 
 
 ### Lookahead support
-As of 0.6.0, the above algorithm has been extended to support lookaheads.
+As of 0.6.0, the Pike and Janson's algorithm has been extended to support lookaheads.
 
-Two versions of the vm now exists (one could be enough): the top-level VM which is the `grouping` VM and the nested `accepting` VM which is simpler becauses it ignores registers, it just tells whether we reached an accept state or not. Not having to track submatches mean than thread priority is not needed any more.
+Two versions of the VM now exists (one could do with one): the top-level VM which is the `grouping` VM and the nested `accepting` VM which is simpler becauses it ignores registers, it just tells whether we reached an accept state or not. Not having to track submatches mean than thread priority is not needed any more.
 
 Previously threads were identified by their PC alone, now with lookahead support, each thread is identified by a pair: its PC and a nested VM state. Because nested VMs don't track submatches their own whole state is their threads ids set. Nested VMs support lookaheads too (so you can put lookaheads in your lookaheads) so nested thread id are pairs of PC and a nested VM state.
 
@@ -167,15 +167,11 @@ nested-vm-state = set of thread-id
 top-level-vm-state = (prioritized) map of thread-id to register-bank 
 ```
 
-Despite the above definitions _the state space is still bounded_ because the nesting depth is bounded by construction (pathological code exists but can't be produced by a regex/seqexp).
+Despite the above definitions _the state space is still bounded_ because the nesting depth is bounded by construction (pathological code exists but can't be produced by a regex/seqexp) so the complexity is still linear with the size of the input.
 
-Two new opcodes are added: `NLA` and `ACCEPT`.
+One new opcode is added: `NLA`.
 
 `NLA addr` spawns thread `[(inc pc) #{}]` in the nested VM while the current VM jumps at `addr`.
-
-`ACCEPT true` jumps at the end of the program.
-
-`ACCEPT false` (unused) kills the current thread.  
 
 The nested VM is used to perform _negative_ lookahead: if it reaches an accept state (PC at the end of the program and empty nested VM state) then the current thread is killed.
 

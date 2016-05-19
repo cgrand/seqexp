@@ -30,7 +30,9 @@
          ~@(map
              (fn [[op arg]]
                (case op
-                 (label jump fork> fork< nla) [[(keyword op) (list gen (keyword arg))]]
+                 (label jump fork> fork< nla) [[(keyword op) (if (#{::ACCEPT} arg)
+                                                               arg
+                                                               (list gen (keyword arg)))]]
                  include `(instructions ~arg)
                  (pred save0 save1 accept) [[(keyword op) arg]]))
              exprs)))))
@@ -163,7 +165,7 @@
     nla main
     include (apply cat es)
     include (* _) ; required to allow nested lookaheads to converge
-    accept true
+    jump ::ACCEPT
     label main))
 
 (defn ?=
@@ -293,8 +295,7 @@
                                        (recur [(inc pc) nla-threads]))
                               (:pred nil) (conj! threads state)
                               :nla (recur threads [(clojure.core/+ pc arg) (into nla-threads (init (inc pc)))])
-                              (:save0 :save1) (recur threads [(inc pc) nla-threads])
-                              :accept (if arg (conj! threads [N nla-threads]) threads))))))
+                              (:save0 :save1) (recur threads [(inc pc) nla-threads]))))))
                          (transient #{}) threads))))]
     {:init (fn [pc] (add-threads [[pc #{}]]))
      :step (fn step [threads x]
@@ -341,8 +342,7 @@
                                    (nil :pred) (conj! threads [pc nla-threads bank])
                                    :nla (recur threads [(clojure.core/+ pc arg) (into nla-threads (la-init (inc pc)))] bank)
                                    :save0 (recur threads [(inc pc) nla-threads] (save0 bank arg pos))
-                                   :save1 (recur threads [(inc pc) nla-threads] (save1 bank arg pos))
-                                   :accept (if arg (conj! threads [N nla-threads bank]) threads)))))))
+                                   :save1 (recur threads [(inc pc) nla-threads] (save1 bank arg pos))))))))
                             (transient []) threads))
                    (inc-pos pos)]))]
       {:init (fn [pc s] (add-threads [[pc #{} regbank]] (init-pos s)))
@@ -378,8 +378,9 @@
    input sequence."
   [re coll & {grps :groups}]
   (fetch (longest-match (link (asm
-                                    include (as :match re)
-                                    save1 :rest))
+                                include (as :match re)
+                                save1 :rest
+                                label ::ACCEPT))
                coll (into {:rest unmatched-rest} grps))))
 
 (defn- map-registers [re f]
