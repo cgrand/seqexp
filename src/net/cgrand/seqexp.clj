@@ -203,7 +203,7 @@
 
 (def all-occurrences (reduce-occurrences conj []))
 
-(def unmatched-rest (register (fn [_ _ [_ & s]] s) nil))
+(def unmatched-rest (register (fn [_ _ pos] (rest pos)) nil))
 
 (extend-protocol RegisterBank
   nil
@@ -304,7 +304,8 @@
                                                 (let [nla-threads (step nla-threads x)]
                                                   (when-not (nla-threads ACCEPT)
                                                     [(inc pc) nla-threads]))))) threads))))
-     :accept? (fn [threads] (contains? threads ACCEPT))})))
+     :accept? (fn [threads] (contains? threads ACCEPT))
+     :failed? (fn [threads] (= #{} threads))})))
 
 (defn- seq-init-pos [s] (cons 0 s))
 (defn- seq-inc-pos [n+s] (cons (inc (first n+s)) (rest (next n+s))))
@@ -352,103 +353,22 @@
                                                   (let [nla-threads (la-step nla-threads x)]
                                                     (when-not (la-accept? nla-threads)
                                                       [(inc pc) nla-threads bank]))))) threads)) pos))
-       :accept? (fn [[threads pos]] (some (fn [thread] (when (= ACCEPT (pop thread)) (peek thread))) threads))}))))
-
-(defn- add-thread [threads pc+nla pos registers insts]
-  (let [N (count insts)
-        [pc nla-pcs] pc+nla
-        add-nla (fn add-nla
-                  ([pc]
-                    (add-nla #{} pc #{}))
-                  ([pcs pc visited-pcs]
-                    (if (or (pcs pc) (visited-pcs pc))
-                      pcs
-                      (let [visited-pcs (conj visited-pcs pc)
-                            [op arg] (nth insts pc nil)]
-                        (case op
-                          :jump (recur pcs (clojure.core/+ pc arg) visited-pcs)
-                          :fork> (-> pcs
-                                   (add-nla (inc pc) visited-pcs)
-                                   (add-nla (clojure.core/+ pc arg) visited-pcs))
-                          :fork< (-> pcs
-                                   (add-nla (clojure.core/+ pc arg) visited-pcs)
-                                   (add-nla (inc pc) visited-pcs))
-                          (:pred nil) (conj pcs pc)
-                          (:save0 :save1) (recur pcs (inc pc) visited-pcs)
-                          :accept (if arg (conj pcs N) pcs))))))
-        nla-pcs (into #{} (mapcat add-nla) nla-pcs)]
-    (if (nla-pcs N)
-      threads
-      (letfn [(add-thread [[ctxs pcs :as threads] pc+nla pos registers visited-pcs]
-                (if (or (ctxs pc+nla) (visited-pcs pc+nla))
-                  threads
-                  (let [visited-pcs (conj visited-pcs pc+nla)
-                        pc (nth pc+nla 0)
-                        [op arg] (nth insts pc nil)]
-                    (case op
-                      :jump (recur threads (assoc pc+nla 0 (clojure.core/+ pc arg)) pos registers visited-pcs)
-                      :fork> (-> threads
-                               (add-thread (assoc pc+nla 0 (inc pc)) pos registers visited-pcs)
-                               (add-thread (assoc pc+nla 0 (clojure.core/+ pc arg)) pos registers visited-pcs))
-                      :fork< (-> threads
-                               (add-thread (assoc pc+nla 0 (clojure.core/+ pc arg)) pos registers visited-pcs)
-                               (add-thread (assoc pc+nla 0 (inc pc)) pos registers visited-pcs))
-                      :nla (let [nla-pcs (-> (nth pc+nla 1) (add-nla (inc pc) #{}) (disj N))] ; N is a removed as performing a negative lookahead with a nullable regex is useless
-                             (recur threads [(clojure.core/+ pc arg) nla-pcs] pos registers visited-pcs))
-                      :accept (if arg
-                                [(assoc ctxs (assoc pc+nla 0 N) registers) (conj pcs (assoc pc+nla 0 N))]
-                                threads)
-                      :save0 (recur threads (assoc pc+nla 0 (inc pc)) pos
-                               (save0 registers arg pos)
-                               visited-pcs)
-                      :save1 (recur threads (assoc pc+nla 0 (inc pc)) pos
-                               (save1 registers arg pos)
-                               visited-pcs)
-                      (:pred nil) [(assoc ctxs pc+nla registers) (conj pcs pc+nla)]))))]
-        (add-thread threads [pc nla-pcs] pos registers #{})))))
-
-(defn- run
-  "Runs a regex until one of these 3 conditions is met:
- * input is exhausted
- * accept state reached
- * failed (an accept state can't be reached even with additional input)."
-  [[insts idx xs [ctxs pcs]]]
-  (let [N (count insts)
-        ACCEPT [N #{}]]
-    (loop [idx idx, xs (seq xs)
-           [ctxs pcs] [(dissoc ctxs ACCEPT)
-                       (filterv (fn [[pc]] (< pc N)) pcs)]]
-      (if (and xs (seq pcs) (not (contains? ctxs ACCEPT)))
-        (let [[x & xs] xs, idx (inc idx)]
-          (recur idx xs
-            (reduce (fn [threads pc+nla]
-                      ; because of (not (contains? ctxs N)) guard above all pcs refers to :pred
-                      (let [[pc nla-pcs] pc+nla
-                            nla-pcs (into #{}
-                                      (keep (fn [pc]
-                                              (let [[_ pred] (nth insts pc)]
-                                                (when (pred x)
-                                                  (inc pc)))))
-                                      nla-pcs)
-                            [_ pred] (nth insts pc)]
-                        (if (and (not (nla-pcs N)) (pred x))
-                          (add-thread threads [(inc pc) nla-pcs] (cons idx xs) (ctxs pc+nla) insts)
-                          threads)))
-              no-threads pcs)))
-        [insts idx xs [ctxs pcs]]))))
+       :accept? (fn [[threads pos]] (some (fn [thread] (when (= ACCEPT (pop thread)) (peek thread))) threads))
+       :failed? (fn [[threads pos]] (= [] threads))}))))
 
 (defn- success [[insts _ _ [ctxs]]]
   (ctxs [(count insts) #{}]))
 
-(defn- init-state [insts coll regs]
-  [insts 0 coll (add-thread no-threads [0 #{}] (cons 0 coll) regs insts)])
-
 (defn- longest-match [insts coll regs]
-  (loop [state (init-state insts coll regs)
-         regs (success state)]
-    (let [state (run state)]
-      (if-let [regs (success state)]
-        (recur state regs)
+  (let [{:keys [init step accept? failed?]} (boot-grouping-vm insts regs)]
+    (loop [state (init 0 coll)
+           regs (accept? state)
+           s coll]
+      (if-some [[x :as s] (seq s)]
+        (let [state (step state x)]
+          (if (failed? state)
+            regs
+            (recur state (or (accept? state) regs) (rest s))))
         regs))))
 
 (defn exec
