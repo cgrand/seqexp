@@ -162,13 +162,14 @@
   (asmpat
     nla main
     include (apply cat es)
+    include (* _) ; required to allow nested lookaheads to converge
     accept true
     label main))
 
 (defn ?=
   "Positive lookahead"
   [& es]
-  (?! (apply ?! es) (* _)))
+  (?! (apply ?! es)))
 
 (def ^:private ^:const no-threads [{} []])
 
