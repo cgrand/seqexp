@@ -181,7 +181,7 @@ A given thread only needs one nested VM even if it traverses sereval negative lo
 main AND NOT nla1 AND NOT nla2 = main AND NOT (nla1 OR nla2)
 ```
 
-Surprisingly _positive lookahead_ comes for free from the decision to supported nested lookaheads:
+Surprisingly _positive lookahead_ comes for free from the decision to support nested lookaheads:
 
 ```
 main AND pla = main AND NOT (NOT pla)
