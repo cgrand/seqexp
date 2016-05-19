@@ -402,7 +402,8 @@
     (fetch
       (longest-match (link (asm
                             include (map-registers (as [] re) #(into [:match] %))
-                            save1 [:rest]))
+                            save1 [:rest]
+                            label ::ACCEPT))
        coll (comp-bank
               {:rest unmatched-rest
                :match (tree-bank mk-node)})))))
