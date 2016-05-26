@@ -354,21 +354,28 @@
                                                     (when-not (la-accept? nla-threads)
                                                       [(inc pc) nla-threads bank]))))) threads)) pos))
        :accept? (fn [[threads pos]] (some (fn [thread] (when (= ACCEPT (pop thread)) (peek thread))) threads))
-       :failed? (fn [[threads pos]] (= [] threads))}))))
+       :failed? (fn [[threads pos]] (= [] threads))
+       :trim (fn [[threads pos]]
+               ; trim keeps only threads whose priority is higher than accept threads
+               ; this gives us control over the longest match policy
+               [(into [] (take-while #(not= ACCEPT (pop %))) threads) pos])}))))
 
 (defn- success [[insts _ _ [ctxs]]]
   (ctxs [(count insts) #{}]))
 
 (defn- longest-match [insts coll regs]
-  (let [{:keys [init step accept? failed?]} (boot-grouping-vm insts regs)]
-    (loop [state (init 0 coll)
-           regs (accept? state)
+  (let [{:keys [init step accept? failed? trim]} (boot-grouping-vm insts regs)
+        state0 (init 0 coll)]
+    (loop [state (trim state0)
+           regs (accept? state0)
            s coll]
       (if-some [[x :as s] (seq s)]
         (let [state (step state x)]
           (if (failed? state)
             regs
-            (recur state (or (accept? state) regs) (rest s))))
+            (if-some [regs (accept? state)]
+              (recur (trim state) regs (rest s))
+              (recur state regs (rest s)))))
         regs))))
 
 (defn exec
@@ -380,6 +387,7 @@
   (fetch (longest-match (link (asm
                                 include (as :match re)
                                 save1 :rest
+                                include (*? _)
                                 label ::ACCEPT))
                coll (into {:rest unmatched-rest} grps))))
 
@@ -403,6 +411,7 @@
       (longest-match (link (asm
                             include (map-registers (as [] re) #(into [:match] %))
                             save1 [:rest]
+                            include (*? _)
                             label ::ACCEPT))
        coll (comp-bank
               {:rest unmatched-rest
