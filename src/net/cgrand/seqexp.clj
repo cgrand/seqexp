@@ -1,7 +1,7 @@
 (ns net.cgrand.seqexp
   "Regular expressions for sequences."
-  (:refer-clojure :exclude [+ * repeat +' *'])
-  (require [clojure.walk :as walk]))
+  (:refer-clojure :exclude [+ * repeat +' *' cat])
+  (:require [clojure.walk :as walk]))
 
 (defprotocol ^:private Regex
   (instructions [re]))

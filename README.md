@@ -16,7 +16,7 @@ Seqexp salient features are:
 Add this dependency to your project.
 
 ```clj
-[net.cgrand/seqexp "0.6.0"]
+[net.cgrand/seqexp "0.6.2"]
 ```
 
 Require it as:
@@ -181,7 +181,7 @@ A given thread only needs one nested VM even if it traverses several negative lo
 main AND NOT nla1 AND NOT nla2 = main AND NOT (nla1 OR nla2)
 ```
 
-Surprisingly _positive lookahead_ comes for free from the decision to support nested lookaheads:
+Surprisingly, _positive lookahead_ comes for free from the decision to support nested lookaheads:
 
 ```
 main AND pla = main AND NOT (NOT pla)
