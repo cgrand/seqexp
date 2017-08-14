@@ -77,8 +77,13 @@
 
 (deftest negative-lookahead
   (are [se s m]
-    (= (:a (se/exec se s)) m)
-    (se/cat (se/*? se/_) (se/?! even?) (se/as :a (se/* se/_))) [2 4 5 6 8] [5 6 8]))
+      (= (:a (se/exec se s)) m)
+    (se/cat (se/*? se/_) (se/?! even?) (se/as :a (se/* se/_))) [2 4 5 6 8] [5 6 8])
+  (are [se s m]
+      (= (:match (se/exec se s)) m)
+    (se/cat :a (se/?! :b)) [:a :c] [:a]
+    (se/cat :a (se/?! :b)) [:a :b] nil
+    (se/cat :a (se/?! :b)) [:a] [:a]))
 
 (deftest positive-lookahead
   (are [se s m]
