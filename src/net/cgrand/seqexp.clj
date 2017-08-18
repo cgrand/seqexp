@@ -1,7 +1,8 @@
 (ns net.cgrand.seqexp
   "Regular expressions for sequences."
   (:refer-clojure :exclude [+ * repeat +' *' cat])
-  (:require [clojure.walk :as walk]))
+  (:require [clojure.walk :as walk]
+            [clojure.pprint :refer [pprint]]))
 
 (defprotocol ^:private Regex
   (instructions [re]))
@@ -305,6 +306,20 @@
                                                 (let [nla-threads (step nla-threads x)]
                                                   (when-not (nla-threads ACCEPT)
                                                     [(inc pc) nla-threads]))))) threads))))
+     :eof (fn eof [threads] (add-threads
+                             (eduction
+                              ;; Run non pred threads to completion. If none
+                              ;; accept negative lookahead succeeds.
+                              (keep (fn [[pc nla-threads]]
+                                      (let [nla-threads (eof nla-threads)]
+                                        (when-not (nla-threads ACCEPT)
+                                          [(min N (inc pc)) nla-threads]))))
+                              ;; With nothing left to consume threads with pred
+                              ;; op will never ACCEPT so drop them right away
+                              (remove (fn [[pc nla-threads]]
+                                        (when-some [[_ pred] (nth insts pc nil)]
+                                          pred)))
+                              threads)))
      :accept? (fn [threads] (contains? threads ACCEPT))
      :failed? (fn [threads] (= #{} threads))})))
 
@@ -316,7 +331,7 @@
   ([insts regbank init-pos inc-pos]
     (let [N (count insts)
           ACCEPT [N #{}]
-          {la-init :init la-step :step la-accept? :accept?} (boot-accepting-vm insts)]
+          {la-init :init la-step :step la-eof :eof la-accept? :accept?} (boot-accepting-vm insts)]
       (letfn [(init [pc] (add-threads [[pc #{} regbank]]))
               (add-threads [threads pos]
                 (let [visited-state (volatile! (transient #{}))]
@@ -355,16 +370,31 @@
                                                       [(inc pc) nla-threads bank]))))) threads)) pos))
        :accept? (fn [[threads pos]] (some (fn [thread] (when (= ACCEPT (pop thread)) (peek thread))) threads))
        :failed? (fn [[threads pos]] (= [] threads))
+       :eof (fn eof [[threads pos]] (let [threads  threads]
+                                      (add-threads (eduction
+                                                    ;; Run remaing threads to ensure nested
+                                                    ;; accepting vms run
+                                                    (keep (fn [[pc nla-threads bank]]
+                                                            (let [nla-threads (la-eof nla-threads)]
+                                                              (when-not (la-accept? nla-threads)
+                                                                [(min N (inc pc)) nla-threads bank]))))
+                                                    ;; With nothing left to consume we can
+                                                    ;; immediately fail threads with pred op
+                                                    (remove (fn [[pc nla-threads bank]]
+                                                              (when-some [[_ pred] (nth insts pc nil)]
+                                                                pred)))
+                                                    threads)
+                                                   pos)))
        :trim (fn [[threads pos]]
-               ; trim keeps only threads whose priority is higher than accept threads
-               ; this gives us control over the longest match policy
+                                        ; trim keeps only threads whose priority is higher than accept threads
+                                        ; this gives us control over the longest match policy
                [(into [] (take-while #(not= ACCEPT (pop %))) threads) pos])}))))
 
 (defn- success [[insts _ _ [ctxs]]]
   (ctxs [(count insts) #{}]))
 
 (defn- longest-match [insts coll regs]
-  (let [{:keys [init step accept? failed? trim]} (boot-grouping-vm insts regs)
+  (let [{:keys [init step accept? failed? eof trim]} (boot-grouping-vm insts regs)
         state0 (init 0 coll)]
     (loop [state (trim state0)
            regs (accept? state0)
@@ -376,7 +406,13 @@
             (if-some [regs (accept? state)]
               (recur (trim state) regs (rest s))
               (recur state regs (rest s)))))
-        regs))))
+        ;; No input left to match against. Run all thread to completion, so that
+        ;; e.g. re that end with a negative lookahead get the chance to run and
+        ;; maybe succeed.
+        (condp #(%1 %2) state
+          accept? :>> identity
+          failed? regs
+          (recur (eof (trim state)) regs (rest s)))))))
 
 (defn exec
   "Executes the regular expression, returns either nil on failure or a map of
