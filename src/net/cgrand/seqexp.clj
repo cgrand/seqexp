@@ -1,8 +1,7 @@
 (ns net.cgrand.seqexp
   "Regular expressions for sequences."
   (:refer-clojure :exclude [+ * repeat +' *' cat])
-  (:require [clojure.walk :as walk]
-            [clojure.pprint :refer [pprint]]))
+  (:require [clojure.walk :as walk]))
 
 (defprotocol ^:private Regex
   (instructions [re]))
@@ -255,7 +254,7 @@
       (fetch [bank] init))))
 
 (defn comp-bank [banks]
-  (reify RegisterBank 
+  (reify RegisterBank
     (save0 [bank [k & ks] v]
       (comp-bank (update banks k save0 ks v)))
     (save1 [bank [k & ks] v]
@@ -386,12 +385,9 @@
                                                     threads)
                                                    pos)))
        :trim (fn [[threads pos]]
-                                        ; trim keeps only threads whose priority is higher than accept threads
-                                        ; this gives us control over the longest match policy
+               ;; trim keeps only threads whose priority is higher than accept threads
+               ;; this gives us control over the longest match policy
                [(into [] (take-while #(not= ACCEPT (pop %))) threads) pos])}))))
-
-(defn- success [[insts _ _ [ctxs]]]
-  (ctxs [(count insts) #{}]))
 
 (defn- longest-match [insts coll regs]
   (let [{:keys [init step accept? failed? eof trim]} (boot-grouping-vm insts regs)
@@ -429,7 +425,7 @@
 
 (defn- map-registers [re f]
   (->Pattern
-    (into [] 
+    (into []
       (map (fn [[op arg :as inst]]
              (case op
                (:save0 :save1) [op (f arg)]
@@ -452,5 +448,3 @@
        coll (comp-bank
               {:rest unmatched-rest
                :match (tree-bank mk-node)})))))
-
-
