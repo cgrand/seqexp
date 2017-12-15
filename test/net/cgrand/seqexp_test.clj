@@ -8,7 +8,9 @@
     3 [3] [3]
     3 [3 3] [3]
     3 [3 4] [3]
-    3 [4 3] nil))
+    3 [4 3] nil
+    'a '(a b) '(a)
+    'a '(b a) nil))
 
 (deftest predicates
   (are [se s m]
@@ -86,4 +88,3 @@
     (se/cat (se/*? se/_) (se/?= odd?) (se/as :a (se/* se/_))) [2 4 5 6 8] [5 6 8]
     (se/cat (se/*? se/_) (se/?= odd? odd?) (se/as :a (se/* se/_))) [2 4 5 6 7 9 8 11] [7 9 8 11]
     (se/cat (se/as :a (se/*? se/_)) (se/?= odd?)) [2 4 5 6 8] [2 4]))
-

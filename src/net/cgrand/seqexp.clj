@@ -41,6 +41,9 @@
   Object
   (instructions [x]
     (instructions #(= x %)))
+  clojure.lang.Symbol
+  (instructions [x]
+    (instructions #(= x %)))
   clojure.lang.AFn
   (instructions [f]
     (asm
@@ -254,7 +257,7 @@
       (fetch [bank] init))))
 
 (defn comp-bank [banks]
-  (reify RegisterBank 
+  (reify RegisterBank
     (save0 [bank [k & ks] v]
       (comp-bank (update banks k save0 ks v)))
     (save1 [bank [k & ks] v]
@@ -393,7 +396,7 @@
 
 (defn- map-registers [re f]
   (->Pattern
-    (into [] 
+    (into []
       (map (fn [[op arg :as inst]]
              (case op
                (:save0 :save1) [op (f arg)]
@@ -416,5 +419,3 @@
        coll (comp-bank
               {:rest unmatched-rest
                :match (tree-bank mk-node)})))))
-
-
