@@ -41,6 +41,9 @@
   Object
   (instructions [x]
     (instructions #(= x %)))
+  clojure.lang.Symbol
+  (instructions [x]
+    (instructions #(= x %)))
   clojure.lang.AFn
   (instructions [f]
     (asm
