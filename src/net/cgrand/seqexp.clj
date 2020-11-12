@@ -131,7 +131,7 @@
     "Matches its body min to max times (inclusive) separated by sep.
      Exists in greedy (repeat') and reluctant (repeat'?) variants."
     ([n sep e]
-      (repeat' n n e))
+      (repeat' n n sep e))
     ([min max sep e]
       (cond
         (pos? min) (cat e (repeat (dec min) (dec max) (cat sep e)))
